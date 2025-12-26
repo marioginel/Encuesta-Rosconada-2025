@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Crown, Star, Gift, Send, Lock, BookOpen, Save, PartyPopper, Flame, Download, KeyRound, AlertTriangle } from 'lucide-react';
+import { Crown, Star, Gift, Send, Lock, BookOpen, Save, PartyPopper, Flame, Download, KeyRound, AlertTriangle, Trash2 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc, getDocs } from 'firebase/firestore';
 
 // --- TUS CLAVES DE FIREBASE ---
 // ¡Copia aquí tus claves de Firebase igual que hiciste la primera vez!
 const firebaseConfig = {
-  apiKey: "AIzaSyBhr91LlpxEF2KUMIUlNCZ_VBqd5EviEjA",
-  authDomain: "encuesta-rosconada-2025.firebaseapp.com",
-  projectId: "encuesta-rosconada-2025",
-  storageBucket: "encuesta-rosconada-2025.firebasestorage.app",
-  messagingSenderId: "245541045856",
-  appId: "1:245541045856:web:feceb8f7cc950cfbbda505",
-  measurementId: "G-7NKLBHSEMP"
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_PROYECTO.firebaseapp.com",
+  projectId: "TU_PROYECTO",
+  storageBucket: "TU_PROYECTO.appspot.com",
+  messagingSenderId: "TUS_NUMEROS",
+  appId: "TUS_DATOS"
 };
 
 // Inicialización de Firebase
@@ -146,7 +145,7 @@ const App = () => {
     setScores(newScores);
   };
 
-  // --- RESULTADOS Y EXPORTACIÓN ---
+  // --- RESULTADOS Y GESTIÓN DE DATOS ---
   useEffect(() => {
     if (mode === 'results' && user) {
         const q = query(collection(db, 'rosconada_2025_votes'));
@@ -160,7 +159,11 @@ const App = () => {
   }, [mode, user]);
 
   const calculateResults = (votes) => {
-      if (votes.length === 0) return;
+      // Calculamos resultados incluso si está vacío (para limpiar la pantalla al borrar)
+      if (votes.length === 0) {
+          setResultsData(null);
+          return;
+      }
       
       const rosconStats = Array(8).fill(0).map((_, i) => ({ 
         id: i, totalPoints: 0, count: 0, comments: [] 
@@ -188,6 +191,22 @@ const App = () => {
 
       const sortedOutfits = Object.entries(outfitVotes).sort(([,a], [,b]) => b - a);
       setResultsData({ roscones: processedRoscones, outfits: sortedOutfits });
+  };
+
+  // Función para Resetear Votos (BORRADO MASIVO)
+  const resetAllVotes = async () => {
+    if (!confirm("⚠️ ¡PELIGRO! ⚠️\n\n¿Estás seguro de que quieres BORRAR TODOS LOS VOTOS?\n\nEsta acción no se puede deshacer y perderás toda la información.")) return;
+    if (!confirm("¿De verdad? Confirma una última vez que quieres reiniciar la Rosconada a cero.")) return;
+
+    try {
+        const querySnapshot = await getDocs(collection(db, 'rosconada_2025_votes'));
+        const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        alert("🗑️ ¡Todos los votos han sido eliminados correctamente!");
+    } catch (error) {
+        console.error("Error borrando:", error);
+        alert("Hubo un error al intentar borrar los datos.");
+    }
   };
 
   const exportToCSV = () => {
@@ -329,18 +348,34 @@ const App = () => {
                     <h1 className="text-2xl font-bold text-yellow-400 flex items-center gap-2">
                         <PartyPopper /> Resultados Finales
                     </h1>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 justify-center md:justify-end">
                         <button 
                             onClick={exportToCSV}
                             className="text-sm bg-green-700 hover:bg-green-600 px-4 py-2 rounded flex items-center gap-2 font-bold transition-colors shadow-lg border border-green-500"
                         >
-                            <Download className="w-4 h-4" /> Exportar Excel
+                            <Download className="w-4 h-4" /> Excel
                         </button>
+                        
+                        {/* BOTÓN DE BORRADO MASIVO */}
+                        <button 
+                            onClick={resetAllVotes}
+                            className="text-sm bg-red-900/80 hover:bg-red-700 px-4 py-2 rounded flex items-center gap-2 font-bold transition-colors shadow-lg border border-red-500 text-red-100"
+                            title="Borrar todos los votos"
+                        >
+                            <Trash2 className="w-4 h-4" /> Reset
+                        </button>
+
                         <button onClick={() => setMode('login')} className="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded border border-slate-500">Salir</button>
                     </div>
                 </div>
 
-                {!resultsData ? <div className="text-center p-10"><div className="animate-spin text-4xl mb-2">🐫</div>Cargando votos...</div> : (
+                {!resultsData ? (
+                    <div className="text-center p-10 text-stone-400 border-2 border-dashed border-stone-700 rounded-xl">
+                        <div className="text-4xl mb-4">🏜️</div>
+                        <p>Aún no hay votos registrados.</p>
+                        <p className="text-sm mt-2">¡Que empiece la cata!</p>
+                    </div>
+                ) : (
                     <div className="space-y-8">
                         {/* RANKING */}
                         <div className="bg-slate-800 rounded-xl p-6 border border-yellow-500/20 shadow-xl">
@@ -461,7 +496,7 @@ const App = () => {
                     <Star className="fill-yellow-400" size={16}/> Bonus: Mejor Atuendo
                 </h3>
                 <div className="relative z-10">
-                    <label className="text-xs text-green-200 block mb-1 uppercase font-bold">¿Quién lleva el jersey navideño mas molón de todos?</label>
+                    <label className="text-xs text-green-200 block mb-1 uppercase font-bold">¿Quién va más elegante (o ridículo)?</label>
                     <input 
                         type="text" 
                         value={bestOutfit}
@@ -498,5 +533,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
-
-
