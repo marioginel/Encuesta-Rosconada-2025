@@ -497,7 +497,7 @@ const App = () => {
                     <Star className="fill-yellow-400" size={16}/> Bonus: Mejor Atuendo
                 </h3>
                 <div className="relative z-10">
-                    <label className="text-xs text-green-200 block mb-1 uppercase font-bold">¿Quién va más elegante (o ridículo)?</label>
+                    <label className="text-xs text-green-200 block mb-1 uppercase font-bold">¿Quién lleva el jersey navideño mas molón?</label>
                     <input 
                         type="text" 
                         value={bestOutfit}
@@ -534,4 +534,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
+
 
