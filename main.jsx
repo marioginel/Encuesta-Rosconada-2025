@@ -8,12 +8,13 @@ import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query } from
 // --- TUS CLAVES DE FIREBASE ---
 // ¡Copia aquí tus claves de Firebase igual que hiciste la primera vez!
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  projectId: "TU_PROYECTO",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "TUS_NUMEROS",
-  appId: "TUS_DATOS"
+  apiKey: "AIzaSyBhr91LlpxEF2KUMIUlNCZ_VBqd5EviEjA",
+  authDomain: "encuesta-rosconada-2025.firebaseapp.com",
+  projectId: "encuesta-rosconada-2025",
+  storageBucket: "encuesta-rosconada-2025.firebasestorage.app",
+  messagingSenderId: "245541045856",
+  appId: "1:245541045856:web:feceb8f7cc950cfbbda505",
+  measurementId: "G-7NKLBHSEMP"
 };
 
 // Inicialización de Firebase
@@ -497,3 +498,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
+
