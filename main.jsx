@@ -549,7 +549,7 @@ const App = () => {
                         onChange={(e) => setBestOutfit(e.target.value)}
                         className="w-full bg-black/20 border border-green-600 rounded-lg p-3 text-white placeholder-green-300/50 focus:border-yellow-400 focus:bg-black/40 outline-none transition-all cursor-pointer"
                     >
-                        <option value="" className="text-black bg-white" disabled>Selecciona al más elegante...</option>
+                        <option value="" className="text-black bg-white" disabled>Cuidado que el ganador se llevara un extra de puntos...</option>
                         {AUTHORIZED_USERS.map((u) => (
                             <option key={u.name} value={u.name} className="text-black bg-white">
                                 {u.name}
@@ -584,4 +584,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
+
 
