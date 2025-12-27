@@ -6,7 +6,6 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc, getDocs } from 'firebase/firestore';
 
 // --- TUS CLAVES DE FIREBASE ---
-// ¡Copia aquí tus claves de Firebase igual que hiciste la primera vez!
 const firebaseConfig = {
   apiKey: "AIzaSyBhr91LlpxEF2KUMIUlNCZ_VBqd5EviEjA",
   authDomain: "encuesta-rosconada-2025.firebaseapp.com",
@@ -23,7 +22,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- CONFIGURACIÓN DE USUARIOS Y CONTRASEÑAS ---
-// ¡Edita los PINs aquí! Pon números o palabras que ellos sepan.
 const AUTHORIZED_USERS = [
   { name: "Laura", pin: "3294" },
   { name: "Mario", pin: "3294" },
@@ -40,13 +38,18 @@ const AUTHORIZED_USERS = [
   { name: "Maroto", pin: "0001" },
   { name: "Claudia", pin: "0001" },
   { name: "LauraC", pin: "1488" },
-  { name: "Edu", pin: "1488" }
+  { name: "Edu", pin: "1488" },
+  // NUEVOS USUARIOS
+  { name: "MC", pin: "1234" },
+  { name: "Gonzalo", pin: "1234" },
+  { name: "Rafa", pin: "1234" },
+  { name: "Sami", pin: "1234" }
 ];
 
 const App = () => {
   // Estados Generales
   const [user, setUser] = useState(null);
-  const [mode, setMode] = useState('login'); // 'login', 'voting', 'results', 'admin_auth'
+  const [mode, setMode] = useState('login'); 
   const [participantName, setParticipantName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -73,8 +76,7 @@ const App = () => {
     onAuthStateChanged(auth, setUser);
   }, []);
 
-  // --- LÓGICA DE LOGIN (NUEVA CON PIN) ---
-
+  // --- LÓGICA DE LOGIN ---
   const handleLogin = async () => {
     setLoading(true);
     setErrorMsg('');
@@ -85,23 +87,19 @@ const App = () => {
         return;
     }
 
-    // Buscar configuración del usuario
     const userConfig = AUTHORIZED_USERS.find(u => u.name === selectedUser);
 
-    // Verificar PIN
-    // Normalizamos a string por si acaso defines el pin como número 1234 en vez de "1234"
     if (String(userPinInput).trim() !== String(userConfig.pin)) {
         setErrorMsg('⛔ Contraseña incorrecta. ¿Seguro que eres tú?');
         setLoading(false);
         return;
     }
 
-    // Login correcto
     setParticipantName(userConfig.name);
     await loadUserData(userConfig.name);
     setMode('voting');
     setLoading(false);
-    setUserPinInput(''); // Limpiar pin por seguridad
+    setUserPinInput(''); 
   };
 
   const loadUserData = async (name) => {
@@ -171,7 +169,7 @@ const App = () => {
     setScores(newScores);
   };
 
-  // --- RESULTADOS ---
+  // --- RESULTADOS (MODIFICADO: SUMA DE PUNTOS) ---
   useEffect(() => {
     if (mode === 'results' && user) {
         const q = query(collection(db, 'rosconada_2025_votes'));
@@ -198,6 +196,7 @@ const App = () => {
       votes.forEach(vote => {
           vote.scores.forEach((score, index) => {
               if (index < 8 && score.rating) {
+                  // AHORA SUMAMOS PUNTOS DIRECTAMENTE
                   rosconStats[index].totalPoints += score.rating;
                   rosconStats[index].count += 1;
                   if(score.notes) rosconStats[index].comments.push(`${vote.participant}: ${score.notes}`);
@@ -209,10 +208,12 @@ const App = () => {
           }
       });
 
+      // ORDENAR POR PUNTUACIÓN TOTAL (NO MEDIA)
       const processedRoscones = rosconStats.map(r => ({
           ...r,
-          average: r.count > 0 ? (r.totalPoints / r.count).toFixed(2) : "0.00"
-      })).sort((a, b) => parseFloat(b.average) - parseFloat(a.average));
+          // Ya no calculamos average, usamos totalPoints directamente para el orden
+          displayScore: r.totalPoints 
+      })).sort((a, b) => b.totalPoints - a.totalPoints);
 
       const sortedOutfits = Object.entries(outfitVotes).sort(([,a], [,b]) => b - a);
       setResultsData({ roscones: processedRoscones, outfits: sortedOutfits });
@@ -269,7 +270,7 @@ const App = () => {
     { value: 3, label: 'Love it', emoji: '😍', color: 'bg-red-50 border-red-200' }
   ];
 
-  // Pantalla LOGIN (ACTUALIZADA)
+  // Pantalla LOGIN
   if (mode === 'login') {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-900 to-black p-4 flex items-center justify-center font-serif text-white">
@@ -283,14 +284,13 @@ const App = () => {
           <p className="text-blue-200 mb-8 text-sm">Edición Reyes & Amigos</p>
           
           <div className="space-y-4">
-            {/* SELECTOR DE NOMBRE */}
             <div className="text-left">
                 <label className="block text-xs font-bold uppercase tracking-wider text-yellow-500/80 mb-1">Nombre:</label>
                 <select 
                 className="w-full bg-black/40 border border-yellow-600/30 rounded-lg p-3 text-lg text-white outline-none focus:border-yellow-400"
                 onChange={(e) => {
                     setSelectedUser(e.target.value);
-                    setUserPinInput(''); // Limpiar pin al cambiar usuario
+                    setUserPinInput(''); 
                     setErrorMsg('');
                 }}
                 value={selectedUser}
@@ -302,14 +302,13 @@ const App = () => {
                 </select>
             </div>
 
-            {/* INPUT DE CONTRASEÑA (Solo aparece si hay usuario seleccionado) */}
             {selectedUser && (
                 <div className="text-left animate-in fade-in slide-in-from-top-4 duration-300">
                     <label className="block text-xs font-bold uppercase tracking-wider text-yellow-500/80 mb-1">Contraseña:</label>
                     <div className="relative">
                         <input 
                             type="password"
-                            inputMode="numeric" // Teclado numérico en móvil
+                            inputMode="numeric" 
                             placeholder="Tu PIN secreto"
                             className="w-full bg-black/40 border border-yellow-600/30 rounded-lg p-3 pl-10 text-lg text-white outline-none focus:border-yellow-400 placeholder-white/20"
                             value={userPinInput}
@@ -440,7 +439,10 @@ const App = () => {
                                                 <div className="font-bold text-lg text-white">Roscón {r.id + 1}</div>
                                                 <div className="text-xs text-slate-400">{r.count} catadores</div>
                                             </div>
-                                            <div className="text-3xl font-black text-green-400 bg-slate-800 px-3 py-1 rounded-lg border border-green-500/30">{r.average}</div>
+                                            {/* AQUÍ MOSTRAMOS LA SUMA TOTAL DE PUNTOS */}
+                                            <div className="text-2xl font-black text-green-400 bg-slate-800 px-3 py-1 rounded-lg border border-green-500/30 min-w-[80px] text-center">
+                                                {r.displayScore} <span className="text-xs font-normal text-green-600">pts</span>
+                                            </div>
                                         </div>
                                         {r.comments.length > 0 && (
                                             <div className="mt-2 pl-14 text-xs italic text-slate-400 border-l-2 border-slate-600 space-y-1">
@@ -540,13 +542,21 @@ const App = () => {
                 </h3>
                 <div className="relative z-10">
                     <label className="text-xs text-green-200 block mb-1 uppercase font-bold">¿Quién lleva el jersey más molón?</label>
-                    <input 
-                        type="text" 
+                    
+                    {/* CAMBIO: INPUT DE TEXTO REEMPLAZADO POR SELECT */}
+                    <select
                         value={bestOutfit}
                         onChange={(e) => setBestOutfit(e.target.value)}
-                        placeholder="Escribe un nombre..."
-                        className="w-full bg-black/20 border border-green-600 rounded-lg p-3 text-white placeholder-green-300/50 focus:border-yellow-400 focus:bg-black/40 outline-none transition-all"
-                    />
+                        className="w-full bg-black/20 border border-green-600 rounded-lg p-3 text-white placeholder-green-300/50 focus:border-yellow-400 focus:bg-black/40 outline-none transition-all cursor-pointer"
+                    >
+                        <option value="" className="text-black bg-white" disabled>Selecciona al más elegante...</option>
+                        {AUTHORIZED_USERS.map((u) => (
+                            <option key={u.name} value={u.name} className="text-black bg-white">
+                                {u.name}
+                            </option>
+                        ))}
+                    </select>
+
                 </div>
             </div>
         </div>
@@ -574,4 +584,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
-
