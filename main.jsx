@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Crown, Star, Gift, Send, Lock, BookOpen, Save, PartyPopper, Flame, Download, KeyRound, AlertTriangle, Trash2 } from 'lucide-react';
+import { Crown, Star, Gift, Send, Lock, BookOpen, Save, PartyPopper, Flame, Download, KeyRound, AlertTriangle, Trash2, UserCheck } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc, getDocs } from 'firebase/firestore';
@@ -8,13 +8,12 @@ import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, delet
 // --- TUS CLAVES DE FIREBASE ---
 // ¡Copia aquí tus claves de Firebase igual que hiciste la primera vez!
 const firebaseConfig = {
-  apiKey: "AIzaSyBhr91LlpxEF2KUMIUlNCZ_VBqd5EviEjA",
-  authDomain: "encuesta-rosconada-2025.firebaseapp.com",
-  projectId: "encuesta-rosconada-2025",
-  storageBucket: "encuesta-rosconada-2025.firebasestorage.app",
-  messagingSenderId: "245541045856",
-  appId: "1:245541045856:web:feceb8f7cc950cfbbda505",
-  measurementId: "G-7NKLBHSEMP"
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_PROYECTO.firebaseapp.com",
+  projectId: "TU_PROYECTO",
+  storageBucket: "TU_PROYECTO.appspot.com",
+  messagingSenderId: "TUS_NUMEROS",
+  appId: "TUS_DATOS"
 };
 
 // Inicialización de Firebase
@@ -22,21 +21,40 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Lista de VIPs (Invitados autorizados)
-const ALLOWED_USERS = [
-  "Laura", "Mario", "Juanma", "Maria", "Porti", "Angeles", 
-  "Kike", "Alba", "Borao", "Ines", "Blasco", "Paula"
+// --- CONFIGURACIÓN DE USUARIOS Y CONTRASEÑAS ---
+// ¡Edita los PINs aquí! Pon números o palabras que ellos sepan.
+const AUTHORIZED_USERS = [
+  { name: "Laura", pin: "3294" },
+  { name: "Mario", pin: "3294" },
+  { name: "Juanma", pin: "1939" },
+  { name: "Maria", pin: "1939" },
+  { name: "Porti", pin: "5678" },
+  { name: "Angeles", pin: "5678" },
+  { name: "Kike", pin: "6432" },
+  { name: "Alba", pin: "6432" },
+  { name: "Borao", pin: "2244" },
+  { name: "Ines", pin: "2244" },
+  { name: "Blasco", pin: "3657" },
+  { name: "Paula", pin: "3657" },
+  { name: "Maroto", pin: "0001" },
+  { name: "Claudia", pin: "0001" },
+  { name: "LauraC", pin: "1488" },
+  { name: "Edu", pin: "1488" }
 ];
 
 const App = () => {
-  // Estados
+  // Estados Generales
   const [user, setUser] = useState(null);
   const [mode, setMode] = useState('login'); // 'login', 'voting', 'results', 'admin_auth'
   const [participantName, setParticipantName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
-  // Estado para la contraseña de admin
+  // Estado Login Usuario
+  const [selectedUser, setSelectedUser] = useState('');
+  const [userPinInput, setUserPinInput] = useState('');
+
+  // Estado Admin
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminError, setAdminError] = useState(false);
 
@@ -44,7 +62,7 @@ const App = () => {
   const [scores, setScores] = useState(Array(8).fill({ rating: null, notes: '' }));
   const [bestOutfit, setBestOutfit] = useState('');
   
-  // Resultados (para modo admin)
+  // Resultados y Datos
   const [resultsData, setResultsData] = useState(null);
   const [rawVotes, setRawVotes] = useState([]); 
 
@@ -54,28 +72,35 @@ const App = () => {
     onAuthStateChanged(auth, setUser);
   }, []);
 
-  // --- LÓGICA DE USUARIOS ---
+  // --- LÓGICA DE LOGIN (NUEVA CON PIN) ---
 
-  const handleLogin = async (nameInput) => {
+  const handleLogin = async () => {
     setLoading(true);
     setErrorMsg('');
     
-    const cleanInput = nameInput.trim();
-    
-    const foundName = ALLOWED_USERS.find(
-      u => u.toLowerCase() === cleanInput.toLowerCase()
-    );
-
-    if (!foundName) {
-      setErrorMsg('⛔ ¡Ups! No estás en la lista de invitados de los Reyes Magos.');
-      setLoading(false);
-      return;
+    if (!selectedUser) {
+        setErrorMsg('⚠️ Por favor, selecciona quién eres.');
+        setLoading(false);
+        return;
     }
 
-    setParticipantName(foundName);
-    await loadUserData(foundName);
+    // Buscar configuración del usuario
+    const userConfig = AUTHORIZED_USERS.find(u => u.name === selectedUser);
+
+    // Verificar PIN
+    // Normalizamos a string por si acaso defines el pin como número 1234 en vez de "1234"
+    if (String(userPinInput).trim() !== String(userConfig.pin)) {
+        setErrorMsg('⛔ Contraseña incorrecta. ¿Seguro que eres tú?');
+        setLoading(false);
+        return;
+    }
+
+    // Login correcto
+    setParticipantName(userConfig.name);
+    await loadUserData(userConfig.name);
     setMode('voting');
     setLoading(false);
+    setUserPinInput(''); // Limpiar pin por seguridad
   };
 
   const loadUserData = async (name) => {
@@ -103,11 +128,10 @@ const App = () => {
   const handleAdminAuth = () => {
     if (adminPasswordInput === "Marotoesimbecil") {
         setAdminError(false);
-        setAdminPasswordInput(''); // Limpiar para la próxima
+        setAdminPasswordInput(''); 
         setMode('results');
     } else {
         setAdminError(true);
-        // Pequeña broma visual o sacudida podría ir aquí
         setTimeout(() => setAdminError(false), 2000);
     }
   };
@@ -125,7 +149,7 @@ const App = () => {
       });
       
       if (manual) {
-        alert("¡Guardado! Puedes seguir editando o cerrar la app.");
+        alert("¡Guardado! Tus votos están a salvo.");
       }
     } catch (error) {
       console.error("Error guardando:", error);
@@ -146,7 +170,7 @@ const App = () => {
     setScores(newScores);
   };
 
-  // --- RESULTADOS Y GESTIÓN DE DATOS ---
+  // --- RESULTADOS ---
   useEffect(() => {
     if (mode === 'results' && user) {
         const q = query(collection(db, 'rosconada_2025_votes'));
@@ -160,7 +184,6 @@ const App = () => {
   }, [mode, user]);
 
   const calculateResults = (votes) => {
-      // Calculamos resultados incluso si está vacío (para limpiar la pantalla al borrar)
       if (votes.length === 0) {
           setResultsData(null);
           return;
@@ -194,19 +217,18 @@ const App = () => {
       setResultsData({ roscones: processedRoscones, outfits: sortedOutfits });
   };
 
-  // Función para Resetear Votos (BORRADO MASIVO)
   const resetAllVotes = async () => {
-    if (!confirm("⚠️ ¡PELIGRO! ⚠️\n\n¿Estás seguro de que quieres BORRAR TODOS LOS VOTOS?\n\nEsta acción no se puede deshacer y perderás toda la información.")) return;
-    if (!confirm("¿De verdad? Confirma una última vez que quieres reiniciar la Rosconada a cero.")) return;
+    if (!confirm("⚠️ ¡PELIGRO! ⚠️\n\n¿Estás seguro de que quieres BORRAR TODOS LOS VOTOS?\n\nEsta acción no se puede deshacer.")) return;
+    if (!confirm("Confirmación final: Se borrará todo.")) return;
 
     try {
         const querySnapshot = await getDocs(collection(db, 'rosconada_2025_votes'));
         const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
-        alert("🗑️ ¡Todos los votos han sido eliminados correctamente!");
+        alert("🗑️ ¡Votos eliminados!");
     } catch (error) {
         console.error("Error borrando:", error);
-        alert("Hubo un error al intentar borrar los datos.");
+        alert("Error al borrar.");
     }
   };
 
@@ -246,7 +268,7 @@ const App = () => {
     { value: 3, label: 'Love it', emoji: '😍', color: 'bg-red-50 border-red-200' }
   ];
 
-  // Pantalla LOGIN
+  // Pantalla LOGIN (ACTUALIZADA)
   if (mode === 'login') {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-900 to-black p-4 flex items-center justify-center font-serif text-white">
@@ -260,25 +282,61 @@ const App = () => {
           <p className="text-blue-200 mb-8 text-sm">Edición Reyes & Amigos</p>
           
           <div className="space-y-4">
-            <label className="block text-left text-xs font-bold uppercase tracking-wider text-yellow-500/80 mb-1">Selecciona tu nombre:</label>
-            <select 
-              className="w-full bg-black/40 border border-yellow-600/30 rounded-lg p-4 text-lg text-white outline-none focus:border-yellow-400"
-              onChange={(e) => handleLogin(e.target.value)}
-              defaultValue=""
-            >
-              <option value="" disabled>¿Quién eres?</option>
-              {ALLOWED_USERS.map(name => (
-                <option key={name} value={name} className="text-black">{name}</option>
-              ))}
-            </select>
+            {/* SELECTOR DE NOMBRE */}
+            <div className="text-left">
+                <label className="block text-xs font-bold uppercase tracking-wider text-yellow-500/80 mb-1">Nombre:</label>
+                <select 
+                className="w-full bg-black/40 border border-yellow-600/30 rounded-lg p-3 text-lg text-white outline-none focus:border-yellow-400"
+                onChange={(e) => {
+                    setSelectedUser(e.target.value);
+                    setUserPinInput(''); // Limpiar pin al cambiar usuario
+                    setErrorMsg('');
+                }}
+                value={selectedUser}
+                >
+                <option value="" disabled>Selecciona tu nombre...</option>
+                {AUTHORIZED_USERS.map(u => (
+                    <option key={u.name} value={u.name} className="text-black">{u.name}</option>
+                ))}
+                </select>
+            </div>
+
+            {/* INPUT DE CONTRASEÑA (Solo aparece si hay usuario seleccionado) */}
+            {selectedUser && (
+                <div className="text-left animate-in fade-in slide-in-from-top-4 duration-300">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-yellow-500/80 mb-1">Contraseña:</label>
+                    <div className="relative">
+                        <input 
+                            type="password"
+                            inputMode="numeric" // Teclado numérico en móvil
+                            placeholder="Tu PIN secreto"
+                            className="w-full bg-black/40 border border-yellow-600/30 rounded-lg p-3 pl-10 text-lg text-white outline-none focus:border-yellow-400 placeholder-white/20"
+                            value={userPinInput}
+                            onChange={(e) => setUserPinInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                        />
+                        <KeyRound className="absolute left-3 top-3.5 w-5 h-5 text-yellow-500/50" />
+                    </div>
+                </div>
+            )}
+
+            {selectedUser && (
+                <button 
+                    onClick={handleLogin}
+                    className="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-3 rounded-lg shadow-lg mt-4 transition-transform active:scale-95 flex items-center justify-center gap-2"
+                >
+                    {loading ? "Verificando..." : (
+                        <>
+                            ENTRAR <UserCheck className="w-5 h-5" />
+                        </>
+                    )}
+                </button>
+            )}
           </div>
 
-          {errorMsg && <p className="text-red-400 mt-4 text-sm bg-red-900/50 p-2 rounded animate-pulse">{errorMsg}</p>}
+          {errorMsg && <p className="text-red-400 mt-4 text-sm bg-red-900/50 p-2 rounded animate-pulse border border-red-500/50">{errorMsg}</p>}
           
-          {loading && <p className="text-yellow-200 mt-4 text-sm animate-pulse">Consultando a los pajes reales...</p>}
-
           <div className="mt-12 pt-6 border-t border-white/10">
-            {/* Cambiado: Ahora lleva al modo admin_auth en vez de results directo */}
             <button onClick={() => setMode('admin_auth')} className="text-xs text-gray-500 hover:text-yellow-500 flex items-center justify-center gap-2 mx-auto transition-colors">
               <Lock className="w-3 h-3" /> Acceso Real (Admin)
             </button>
@@ -288,12 +346,11 @@ const App = () => {
     );
   }
 
-  // Pantalla PASSWORD ADMIN (NUEVA)
+  // Pantalla PASSWORD ADMIN
   if (mode === 'admin_auth') {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center font-serif p-4">
         <div className="bg-stone-900 p-8 rounded-xl border border-red-800 shadow-2xl w-full max-w-xs text-center relative overflow-hidden">
-            {/* Fondo animado sutil */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-50"></div>
             
             <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
@@ -323,16 +380,11 @@ const App = () => {
 
             {adminError && (
                 <p className="text-red-500 text-xs mt-4 font-bold animate-pulse">
-                    🚫 ACCESO DENEGADO (Carbón para ti)
+                    🚫 ACCESO DENEGADO
                 </p>
             )}
-            
             <style>{`
-                @keyframes shake {
-                    0%, 100% { transform: translateX(0); }
-                    25% { transform: translateX(-5px); }
-                    75% { transform: translateX(5px); }
-                }
+                @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
                 .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
             `}</style>
         </div>
@@ -357,11 +409,9 @@ const App = () => {
                             <Download className="w-4 h-4" /> Excel
                         </button>
                         
-                        {/* BOTÓN DE BORRADO MASIVO */}
                         <button 
                             onClick={resetAllVotes}
                             className="text-sm bg-red-900/80 hover:bg-red-700 px-4 py-2 rounded flex items-center gap-2 font-bold transition-colors shadow-lg border border-red-500 text-red-100"
-                            title="Borrar todos los votos"
                         >
                             <Trash2 className="w-4 h-4" /> Reset
                         </button>
@@ -378,7 +428,6 @@ const App = () => {
                     </div>
                 ) : (
                     <div className="space-y-8">
-                        {/* RANKING */}
                         <div className="bg-slate-800 rounded-xl p-6 border border-yellow-500/20 shadow-xl">
                             <h2 className="text-xl font-bold mb-6 text-center text-yellow-200 tracking-wider flex items-center justify-center gap-2"><Crown className="text-yellow-500"/> PODIUM DE ROSCONES</h2>
                             <div className="space-y-4">
@@ -392,7 +441,6 @@ const App = () => {
                                             </div>
                                             <div className="text-3xl font-black text-green-400 bg-slate-800 px-3 py-1 rounded-lg border border-green-500/30">{r.average}</div>
                                         </div>
-                                        {/* Comentarios destacados */}
                                         {r.comments.length > 0 && (
                                             <div className="mt-2 pl-14 text-xs italic text-slate-400 border-l-2 border-slate-600 space-y-1">
                                                 {r.comments.map((c, idx) => <div key={idx}>"{c}"</div>)}
@@ -403,7 +451,6 @@ const App = () => {
                             </div>
                         </div>
 
-                        {/* OUTFIT */}
                         <div className="bg-gradient-to-r from-green-900 to-emerald-900 rounded-xl p-6 border border-green-500/30 shadow-lg">
                             <h2 className="text-xl font-bold mb-6 text-center text-green-200 flex items-center justify-center gap-2"><Gift /> PREMIO AL ESTILO</h2>
                             <div className="flex flex-wrap gap-3 justify-center">
@@ -425,7 +472,6 @@ const App = () => {
   // PANTALLA VOTACIÓN (PRINCIPAL)
   return (
     <div className="min-h-screen bg-[#FDFBF7] font-serif pb-32">
-        {/* Navbar */}
         <div className="bg-[#8B0000] text-yellow-100 px-4 py-3 shadow-lg sticky top-0 z-20 border-b-4 border-yellow-600 flex justify-between items-center">
             <div className="flex items-center gap-2">
                 <Crown className="fill-yellow-500 text-yellow-600 w-6 h-6" />
@@ -435,7 +481,7 @@ const App = () => {
                 <span className="text-xs md:text-sm bg-black/20 px-3 py-1 rounded-full border border-white/10 flex items-center gap-1">
                     🐫 {participantName}
                 </span>
-                <button onClick={() => {setMode('login'); setParticipantName('');}} className="text-xs opacity-60 hover:opacity-100">Salir</button>
+                <button onClick={() => {setMode('login'); setParticipantName(''); setSelectedUser(''); setUserPinInput('');}} className="text-xs opacity-60 hover:opacity-100">Salir</button>
             </div>
         </div>
 
@@ -444,10 +490,8 @@ const App = () => {
                 <p className="text-[#8B0000] text-sm italic opacity-80">"Que gane el de nata..."</p>
             </div>
 
-            {/* Lista de Roscones */}
             {scores.map((score, index) => (
                 <div key={index} className="bg-white rounded-xl shadow-md border-2 border-[#E5E5E5] overflow-hidden group hover:border-yellow-400 transition-colors">
-                    {/* Cabecera del Roscón */}
                     <div className="bg-stone-100 p-3 border-b border-stone-200 flex justify-between items-center">
                         <div className="flex items-center gap-2">
                             <span className="bg-[#8B0000] text-white text-xs font-bold px-2 py-1 rounded shadow-sm">#{index + 1}</span>
@@ -457,7 +501,6 @@ const App = () => {
                     </div>
 
                     <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Botones de Voto */}
                         <div className="flex justify-between gap-2">
                             {ratingOptions.map((option) => (
                                 <button
@@ -476,7 +519,6 @@ const App = () => {
                             ))}
                         </div>
 
-                        {/* Campo de Comentarios */}
                         <div className="relative">
                             <BookOpen className="absolute top-3 left-3 w-4 h-4 text-stone-400" />
                             <textarea
@@ -490,14 +532,13 @@ const App = () => {
                 </div>
             ))}
 
-            {/* Bonus Track */}
             <div className="bg-gradient-to-r from-green-800 to-emerald-900 rounded-xl p-6 text-white shadow-lg border-2 border-yellow-500/50 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10"><Gift size={100} /></div>
                 <h3 className="font-bold text-yellow-400 uppercase tracking-widest mb-4 flex items-center gap-2 relative z-10">
                     <Star className="fill-yellow-400" size={16}/> Bonus: Mejor Atuendo
                 </h3>
                 <div className="relative z-10">
-                    <label className="text-xs text-green-200 block mb-1 uppercase font-bold">¿Quién lleva el jersey navideño mas molón?</label>
+                    <label className="text-xs text-green-200 block mb-1 uppercase font-bold">¿Quién lleva el jersey más molón?</label>
                     <input 
                         type="text" 
                         value={bestOutfit}
@@ -509,7 +550,6 @@ const App = () => {
             </div>
         </div>
 
-        {/* Floating Action Bar */}
         <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-stone-200 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-30">
             <div className="max-w-3xl mx-auto flex gap-3">
                 <button 
@@ -528,11 +568,8 @@ const App = () => {
   );
 };
 
-// Renderizado
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
-
-
