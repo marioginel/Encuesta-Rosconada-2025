@@ -40,8 +40,8 @@ const AUTHORIZED_USERS = [
   { name: "LauraC", pin: "1488" },
   { name: "Edu", pin: "1488" },
   // NUEVOS USUARIOS
-  { name: "MC", pin: "1234" },
-  { name: "Gonzalo", pin: "1234" },
+  { name: "MC", pin: "1898" },
+  { name: "Gonzalo", pin: "1898" },
   { name: "Rafa", pin: "1234" },
   { name: "Sami", pin: "1234" }
 ];
@@ -584,3 +584,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
+
