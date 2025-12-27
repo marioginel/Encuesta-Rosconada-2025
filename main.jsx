@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Crown, Star, Gift, Send, Lock, BookOpen, Save, PartyPopper, Flame, Download, KeyRound, AlertTriangle, Trash2, UserCheck } from 'lucide-react';
+import { Crown, Star, Gift, Send, Lock, BookOpen, Save, PartyPopper, Flame, Download, KeyRound, AlertTriangle, Trash2, UserCheck, Tag, Edit3 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc, getDocs } from 'firebase/firestore';
@@ -39,12 +39,14 @@ const AUTHORIZED_USERS = [
   { name: "Claudia", pin: "0001" },
   { name: "LauraC", pin: "1488" },
   { name: "Edu", pin: "1488" },
-  // NUEVOS USUARIOS
   { name: "MC", pin: "1898" },
   { name: "Gonzalo", pin: "1898" },
   { name: "Rafa", pin: "1234" },
   { name: "Sami", pin: "1234" }
 ];
+
+// NUMERO DE ROSCONES (Ahora son 9)
+const TOTAL_ROSCONES = 9;
 
 const App = () => {
   // Estados Generales
@@ -61,9 +63,12 @@ const App = () => {
   // Estado Admin
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminError, setAdminError] = useState(false);
+  // Nuevo: Nombres de los roscones (Solo Admin)
+  const [rosconNames, setRosconNames] = useState(Array(TOTAL_ROSCONES).fill(''));
+  const [showNameEditor, setShowNameEditor] = useState(false);
 
-  // Datos de votación (8 Roscones)
-  const [scores, setScores] = useState(Array(8).fill({ rating: null, notes: '' }));
+  // Datos de votación (9 Roscones)
+  const [scores, setScores] = useState(Array(TOTAL_ROSCONES).fill({ rating: null, notes: '' }));
   const [bestOutfit, setBestOutfit] = useState('');
   
   // Resultados y Datos
@@ -74,6 +79,28 @@ const App = () => {
   useEffect(() => {
     signInAnonymously(auth).catch((error) => console.error("Error Auth", error));
     onAuthStateChanged(auth, setUser);
+  }, []);
+
+  // Cargar nombres de roscones (Configuración Admin)
+  useEffect(() => {
+    const fetchConfig = async () => {
+        try {
+            const docRef = doc(db, 'rosconada_2025_votes', 'ADMIN_CONFIG');
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.rosconNames && Array.isArray(data.rosconNames)) {
+                    // Rellenar array hasta el total por si acaso cambió el número
+                    const loadedNames = data.rosconNames;
+                    const fullNames = [...loadedNames, ...Array(TOTAL_ROSCONES - loadedNames.length).fill('')];
+                    setRosconNames(fullNames);
+                }
+            }
+        } catch (e) {
+            console.error("Error cargando config admin:", e);
+        }
+    };
+    fetchConfig();
   }, []);
 
   // --- LÓGICA DE LOGIN ---
@@ -110,12 +137,12 @@ const App = () => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         const loadedScores = data.scores || [];
-        const fullScores = [...loadedScores, ...Array(8 - loadedScores.length).fill({ rating: null, notes: '' })];
+        const fullScores = [...loadedScores, ...Array(TOTAL_ROSCONES - loadedScores.length).fill({ rating: null, notes: '' })];
         
         setScores(fullScores);
         setBestOutfit(data.bestOutfit || '');
       } else {
-        setScores(Array(8).fill({ rating: null, notes: '' }));
+        setScores(Array(TOTAL_ROSCONES).fill({ rating: null, notes: '' }));
         setBestOutfit('');
       }
     } catch (e) {
@@ -135,7 +162,27 @@ const App = () => {
     }
   };
 
-  // --- GUARDADO DE DATOS ---
+  // Guardar nombres de los roscones
+  const saveRosconNames = async () => {
+    try {
+        await setDoc(doc(db, 'rosconada_2025_votes', 'ADMIN_CONFIG'), {
+            rosconNames: rosconNames
+        }, { merge: true });
+        alert("✅ Nombres de roscones actualizados");
+        setShowNameEditor(false);
+    } catch (e) {
+        console.error("Error guardando nombres:", e);
+        alert("Error al guardar nombres");
+    }
+  };
+
+  const handleRosconNameChange = (index, value) => {
+      const newNames = [...rosconNames];
+      newNames[index] = value;
+      setRosconNames(newNames);
+  };
+
+  // --- GUARDADO DE DATOS DE VOTACIÓN ---
   const saveVotes = async (manual = false) => {
     if (!participantName) return;
     
@@ -169,12 +216,14 @@ const App = () => {
     setScores(newScores);
   };
 
-  // --- RESULTADOS (MODIFICADO: SUMA DE PUNTOS) ---
+  // --- RESULTADOS (SUMA DE PUNTOS) ---
   useEffect(() => {
     if (mode === 'results' && user) {
         const q = query(collection(db, 'rosconada_2025_votes'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const votes = snapshot.docs.map(doc => doc.data());
+            const votes = snapshot.docs
+                .map(doc => doc.data())
+                .filter(doc => doc.participant); // Filtrar documentos de configuración como ADMIN_CONFIG
             setRawVotes(votes); 
             calculateResults(votes);
         });
@@ -188,15 +237,14 @@ const App = () => {
           return;
       }
       
-      const rosconStats = Array(8).fill(0).map((_, i) => ({ 
+      const rosconStats = Array(TOTAL_ROSCONES).fill(0).map((_, i) => ({ 
         id: i, totalPoints: 0, count: 0, comments: [] 
       }));
       const outfitVotes = {};
 
       votes.forEach(vote => {
           vote.scores.forEach((score, index) => {
-              if (index < 8 && score.rating) {
-                  // AHORA SUMAMOS PUNTOS DIRECTAMENTE
+              if (index < TOTAL_ROSCONES && score.rating) {
                   rosconStats[index].totalPoints += score.rating;
                   rosconStats[index].count += 1;
                   if(score.notes) rosconStats[index].comments.push(`${vote.participant}: ${score.notes}`);
@@ -208,10 +256,8 @@ const App = () => {
           }
       });
 
-      // ORDENAR POR PUNTUACIÓN TOTAL (NO MEDIA)
       const processedRoscones = rosconStats.map(r => ({
           ...r,
-          // Ya no calculamos average, usamos totalPoints directamente para el orden
           displayScore: r.totalPoints 
       })).sort((a, b) => b.totalPoints - a.totalPoints);
 
@@ -225,7 +271,10 @@ const App = () => {
 
     try {
         const querySnapshot = await getDocs(collection(db, 'rosconada_2025_votes'));
-        const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+        // Borrar todos MENOS la configuración de admin (ADMIN_CONFIG)
+        const deletePromises = querySnapshot.docs
+            .filter(doc => doc.id !== 'ADMIN_CONFIG')
+            .map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
         alert("🗑️ ¡Votos eliminados!");
     } catch (error) {
@@ -238,14 +287,16 @@ const App = () => {
     if (rawVotes.length === 0) return alert("No hay votos para exportar");
 
     let csvContent = "Participante,Mejor Atuendo,";
-    for(let i=0; i<8; i++) {
-        csvContent += `Roscon ${i+1} Puntos,Roscon ${i+1} Notas,`;
+    for(let i=0; i<TOTAL_ROSCONES; i++) {
+        // Usar el nombre asignado si existe en la cabecera del CSV
+        const rName = rosconNames[i] ? `Roscón ${i+1} (${rosconNames[i]})` : `Roscón ${i+1}`;
+        csvContent += `${rName} Puntos,${rName} Notas,`;
     }
     csvContent += "\n";
 
     rawVotes.forEach(vote => {
         let row = `"${vote.participant}","${vote.bestOutfit || ''}",`;
-        for(let i=0; i<8; i++) {
+        for(let i=0; i<TOTAL_ROSCONES; i++) {
             const score = vote.scores[i] || { rating: '', notes: '' };
             const cleanNote = (score.notes || '').replace(/(\r\n|\n|\r)/gm, " "); 
             row += `${score.rating || ''},"${cleanNote}",`;
@@ -263,14 +314,15 @@ const App = () => {
     document.body.removeChild(link);
   };
 
-  // --- UI HELPERS ---
   const ratingOptions = [
     { value: 1, label: 'Sin más', emoji: '😐', color: 'bg-stone-100 border-stone-300' },
     { value: 2, label: 'Normal', emoji: '🙂', color: 'bg-blue-50 border-blue-200' },
     { value: 3, label: 'Love it', emoji: '😍', color: 'bg-red-50 border-red-200' }
   ];
 
-  // Pantalla LOGIN
+  // --- VISTAS ---
+
+  // LOGIN
   if (mode === 'login') {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-900 to-black p-4 flex items-center justify-center font-serif text-white">
@@ -346,7 +398,7 @@ const App = () => {
     );
   }
 
-  // Pantalla PASSWORD ADMIN
+  // ADMIN AUTH
   if (mode === 'admin_auth') {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center font-serif p-4">
@@ -377,54 +429,74 @@ const App = () => {
             <button onClick={() => setMode('login')} className="text-stone-500 text-xs hover:text-white underline">
                 Volver a zona segura
             </button>
-
-            {adminError && (
-                <p className="text-red-500 text-xs mt-4 font-bold animate-pulse">
-                    🚫 ACCESO DENEGADO
-                </p>
-            )}
-            <style>{`
-                @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
-                .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
-            `}</style>
         </div>
       </div>
     );
   }
 
-  // Pantalla RESULTADOS
+  // RESULTADOS (ADMIN)
   if (mode === 'results') {
     return (
         <div className="min-h-screen bg-slate-900 p-4 font-sans text-white">
             <div className="max-w-3xl mx-auto pb-20">
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8 bg-slate-800 p-4 rounded-xl border border-slate-700 gap-4">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-6 bg-slate-800 p-4 rounded-xl border border-slate-700 gap-4">
                     <h1 className="text-2xl font-bold text-yellow-400 flex items-center gap-2">
-                        <PartyPopper /> Resultados Finales
+                        <PartyPopper /> Resultados
                     </h1>
-                    <div className="flex flex-wrap gap-2 justify-center md:justify-end">
+                    <div className="flex flex-wrap gap-2 justify-center">
+                        <button 
+                            onClick={() => setShowNameEditor(!showNameEditor)}
+                            className="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded flex items-center gap-2 font-bold border border-blue-500"
+                        >
+                            <Tag className="w-4 h-4" /> {showNameEditor ? "Ocultar Nombres" : "Bautizar Roscones"}
+                        </button>
                         <button 
                             onClick={exportToCSV}
-                            className="text-sm bg-green-700 hover:bg-green-600 px-4 py-2 rounded flex items-center gap-2 font-bold transition-colors shadow-lg border border-green-500"
+                            className="text-sm bg-green-700 hover:bg-green-600 px-3 py-2 rounded flex items-center gap-2 font-bold border border-green-500"
                         >
-                            <Download className="w-4 h-4" /> Excel
+                            <Download className="w-4 h-4" /> CSV
                         </button>
-                        
                         <button 
                             onClick={resetAllVotes}
-                            className="text-sm bg-red-900/80 hover:bg-red-700 px-4 py-2 rounded flex items-center gap-2 font-bold transition-colors shadow-lg border border-red-500 text-red-100"
+                            className="text-sm bg-red-900/80 hover:bg-red-700 px-3 py-2 rounded flex items-center gap-2 font-bold border border-red-500 text-red-100"
                         >
-                            <Trash2 className="w-4 h-4" /> Reset
+                            <Trash2 className="w-4 h-4" />
                         </button>
-
-                        <button onClick={() => setMode('login')} className="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded border border-slate-500">Salir</button>
+                        <button onClick={() => setMode('login')} className="text-sm bg-slate-700 px-3 py-2 rounded border border-slate-500">Salir</button>
                     </div>
                 </div>
+
+                {/* EDITOR DE NOMBRES (SOLO ADMIN) */}
+                {showNameEditor && (
+                    <div className="bg-slate-800 p-6 rounded-xl border border-blue-500/50 mb-8 animate-in slide-in-from-top-4">
+                        <h2 className="text-lg font-bold text-blue-300 mb-4 flex items-center gap-2"><Edit3 className="w-5 h-5"/> Asignar Nombres Reales</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            {rosconNames.map((name, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-400 w-16">Roscón {i+1}</span>
+                                    <input 
+                                        type="text" 
+                                        value={name}
+                                        onChange={(e) => handleRosconNameChange(i, e.target.value)}
+                                        placeholder={`Ej: Mercadona...`}
+                                        className="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-white focus:border-blue-400 outline-none"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        <button 
+                            onClick={saveRosconNames}
+                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded transition-colors"
+                        >
+                            GUARDAR NOMBRES
+                        </button>
+                    </div>
+                )}
 
                 {!resultsData ? (
                     <div className="text-center p-10 text-stone-400 border-2 border-dashed border-stone-700 rounded-xl">
                         <div className="text-4xl mb-4">🏜️</div>
                         <p>Aún no hay votos registrados.</p>
-                        <p className="text-sm mt-2">¡Que empiece la cata!</p>
                     </div>
                 ) : (
                     <div className="space-y-8">
@@ -436,10 +508,17 @@ const App = () => {
                                         <div className="flex items-center gap-4 mb-2">
                                             <div className={`text-3xl font-black w-10 text-center ${i===0 ? 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]' : i===1 ? 'text-gray-300' : i===2 ? 'text-amber-700' : 'text-slate-600'}`}>#{i+1}</div>
                                             <div className="flex-grow">
-                                                <div className="font-bold text-lg text-white">Roscón {r.id + 1}</div>
+                                                <div className="font-bold text-lg text-white">
+                                                    Roscón {r.id + 1}
+                                                    {/* Mostrar nombre asignado si existe */}
+                                                    {rosconNames[r.id] && (
+                                                        <span className="ml-2 text-yellow-300 font-normal italic text-sm">
+                                                            — {rosconNames[r.id]}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="text-xs text-slate-400">{r.count} catadores</div>
                                             </div>
-                                            {/* AQUÍ MOSTRAMOS LA SUMA TOTAL DE PUNTOS */}
                                             <div className="text-2xl font-black text-green-400 bg-slate-800 px-3 py-1 rounded-lg border border-green-500/30 min-w-[80px] text-center">
                                                 {r.displayScore} <span className="text-xs font-normal text-green-600">pts</span>
                                             </div>
@@ -472,7 +551,7 @@ const App = () => {
     );
   }
 
-  // PANTALLA VOTACIÓN (PRINCIPAL)
+  // VOTACIÓN (USUARIO)
   return (
     <div className="min-h-screen bg-[#FDFBF7] font-serif pb-32">
         <div className="bg-[#8B0000] text-yellow-100 px-4 py-3 shadow-lg sticky top-0 z-20 border-b-4 border-yellow-600 flex justify-between items-center">
@@ -542,21 +621,18 @@ const App = () => {
                 </h3>
                 <div className="relative z-10">
                     <label className="text-xs text-green-200 block mb-1 uppercase font-bold">¿Quién lleva el jersey más molón?</label>
-                    
-                    {/* CAMBIO: INPUT DE TEXTO REEMPLAZADO POR SELECT */}
                     <select
                         value={bestOutfit}
                         onChange={(e) => setBestOutfit(e.target.value)}
                         className="w-full bg-black/20 border border-green-600 rounded-lg p-3 text-white placeholder-green-300/50 focus:border-yellow-400 focus:bg-black/40 outline-none transition-all cursor-pointer"
                     >
-                        <option value="" className="text-black bg-white" disabled>Cuidado que el ganador se llevara un extra de puntos...</option>
+                        <option value="" className="text-black bg-white" disabled>Selecciona al más elegante...</option>
                         {AUTHORIZED_USERS.map((u) => (
                             <option key={u.name} value={u.name} className="text-black bg-white">
                                 {u.name}
                             </option>
                         ))}
                     </select>
-
                 </div>
             </div>
         </div>
@@ -584,5 +660,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
-
-
