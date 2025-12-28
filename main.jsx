@@ -25,8 +25,8 @@ const db = getFirestore(app);
 const AUTHORIZED_USERS = [
   { name: "Laura", pin: "3294" },
   { name: "Mario", pin: "3294" },
-  { name: "Juanma", pin: "1939" },
-  { name: "Maria", pin: "1939" },
+  { name: "Juanma", pin: "9876" },
+  { name: "Maria", pin: "9876" },
   { name: "Porti", pin: "5678" },
   { name: "Angeles", pin: "5678" },
   { name: "Kike", pin: "6432" },
@@ -658,3 +658,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
+
